@@ -3,12 +3,12 @@
 import type React from "react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Loader2 } from "lucide-react"
 
 export default function ManagerLoginClient() {
@@ -17,13 +17,12 @@ export default function ManagerLoginClient() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const [storeLocation, setStoreLocation] = useState("")
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Simple validation
-    if (!email || !password || !storeLocation) {
+    if (!email || !password) {
       setError("Please fill in all fields")
       return
     }
@@ -96,25 +95,7 @@ export default function ManagerLoginClient() {
                 disabled={isLoading}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="store-location">Store Location</Label>
-              <Select value={storeLocation} onValueChange={setStoreLocation} disabled={isLoading}>
-                <SelectTrigger id="store-location">
-                  <SelectValue placeholder="Select your store location" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="walmart-supercenter-main-st">
-                    Walmart Supercenter - 123 Main St, Springfield
-                  </SelectItem>
-                  <SelectItem value="walmart-neighborhood-oak-ave">
-                    Walmart Neighborhood Market - 456 Oak Ave, Springfield
-                  </SelectItem>
-                  <SelectItem value="walmart-supercenter-river-rd">
-                    Walmart Supercenter - 789 River Rd, Springfield
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (
                 <>
@@ -127,9 +108,15 @@ export default function ManagerLoginClient() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center">
+        <CardFooter className="flex flex-col items-center gap-2 border-t p-4">
           <p className="text-sm text-muted-foreground">
             {isLoading ? "Authenticating..." : "Enter your manager credentials to continue"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Don't have an account?{" "}
+            <Link href="/manager-register" className="text-primary hover:underline">
+              Register here
+            </Link>
           </p>
         </CardFooter>
       </Card>

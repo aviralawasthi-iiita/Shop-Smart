@@ -6,14 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-// Store mapping
-const storeMapping: { [key: string]: number } = {
-  "walmart-supercenter-main-st": 1,
-  "walmart-neighborhood-oak-ave": 2,
-  "walmart-supercenter-river-rd": 3,
-}
+import { StoreCombobox, StoreInfo } from "@/components/store-combobox"
 
 // Announcement interface
 interface Announcement {
@@ -68,6 +61,7 @@ export default function HearingImpairedClient({ announcements = [] }: HearingImp
 
   // Announcement states
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null)
+  const [selectedStoreName, setSelectedStoreName] = useState<string>("Unknown Store")
   const [showStoreSelection, setShowStoreSelection] = useState(false)
   const [readAnnouncements, setReadAnnouncements] = useState<Set<string>>(new Set())
   const [showAnnouncementsList, setShowAnnouncementsList] = useState(false)
@@ -90,11 +84,13 @@ export default function HearingImpairedClient({ announcements = [] }: HearingImp
   // Initialize store selection and read announcements from localStorage
   useEffect(() => {
     const storedStoreId = localStorage.getItem("storeId")
+    const storedStoreName = localStorage.getItem("storeName")
     const storedReadAnnouncements = localStorage.getItem("readAnnouncements")
     const storedDismissed = localStorage.getItem("storeSelectionDismissed")
 
     if (storedStoreId) {
       setSelectedStoreId(Number.parseInt(storedStoreId))
+      if (storedStoreName) setSelectedStoreName(storedStoreName)
     } else if (storedDismissed === "true") {
       setStoreSelectionDismissed(true)
     } else {
@@ -139,12 +135,13 @@ export default function HearingImpairedClient({ announcements = [] }: HearingImp
     setLastAnnouncementCount(filteredAnnouncements.length)
   }, [filteredAnnouncements, lastAnnouncementCount])
 
-  const handleStoreSelection = (storeKey: string) => {
-    const storeId = storeMapping[storeKey]
-    setSelectedStoreId(storeId)
+  const handleStoreSelection = (store: StoreInfo) => {
+    setSelectedStoreId(store.storeId)
+    setSelectedStoreName(store.storeName)
     setStoreSelectionDismissed(false)
     setStoreSelectionOpenedViaButton(false)
-    localStorage.setItem("storeId", storeId.toString())
+    localStorage.setItem("storeId", store.storeId.toString())
+    localStorage.setItem("storeName", store.storeName)
     localStorage.removeItem("storeSelectionDismissed")
     setShowStoreSelection(false)
   }
@@ -152,6 +149,7 @@ export default function HearingImpairedClient({ announcements = [] }: HearingImp
   // Handle exit store
   const handleExitStore = () => {
     localStorage.removeItem("storeId")
+    localStorage.removeItem("storeName")
     localStorage.removeItem("readAnnouncements")
     localStorage.removeItem("storeSelectionDismissed")
     setSelectedStoreId(null)
@@ -171,8 +169,7 @@ export default function HearingImpairedClient({ announcements = [] }: HearingImp
 
   // Get store name by ID
   const getStoreName = (storeId: number) => {
-    const entry = Object.entries(storeMapping).find(([, id]) => id === storeId)
-    return entry ? entry[0].replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()) : "Unknown Store"
+    return selectedStoreName
   }
 
   // --- Preload and select female voice once ---
@@ -344,18 +341,12 @@ export default function HearingImpairedClient({ announcements = [] }: HearingImp
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-gray-300">Please choose the Walmart store you are entering:</p>
-            <Select onValueChange={handleStoreSelection}>
-              <SelectTrigger className="bg-gray-700 border-gray-600">
-                <SelectValue placeholder="Choose a store" />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-700 border-gray-600">
-                {Object.keys(storeMapping).map((storeKey) => (
-                  <SelectItem key={storeKey} value={storeKey} className="text-white hover:bg-gray-600">
-                    {storeKey.replace(/-/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <StoreCombobox 
+              selectedStoreId={selectedStoreId} 
+              onSelectStore={handleStoreSelection}
+              buttonClassName="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+              className="w-full bg-gray-700 border-gray-600 text-white"
+            />
           </div>
         </DialogContent>
       </Dialog>

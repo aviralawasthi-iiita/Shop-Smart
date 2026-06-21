@@ -5,6 +5,8 @@ import { Mic, MicOff, Camera, CameraOff, Loader2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { StoreCombobox, StoreInfo } from "@/components/store-combobox"
 
 // --- Custom Hook for Typewriter Effect ---
 const useTypewriter = (text: string, speed = 50) => {
@@ -67,6 +69,44 @@ export default function VisuallyImpairedClient() {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [permissionError, setPermissionError] = useState<string | null>(null)
   const [femaleVoice, setFemaleVoice] = useState<SpeechSynthesisVoice | null>(null)
+
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null)
+  const [selectedStoreName, setSelectedStoreName] = useState<string>("Unknown Store")
+  const [showStoreSelection, setShowStoreSelection] = useState(false)
+  const [storeSelectionDismissed, setStoreSelectionDismissed] = useState(false)
+
+  // Initialize store selection
+  useEffect(() => {
+    const storedStoreId = localStorage.getItem("storeId")
+    const storedStoreName = localStorage.getItem("storeName")
+    const storedDismissed = localStorage.getItem("storeSelectionDismissed")
+
+    if (storedStoreId) {
+      setSelectedStoreId(Number.parseInt(storedStoreId))
+      if (storedStoreName) setSelectedStoreName(storedStoreName)
+    } else if (storedDismissed === "true") {
+      setStoreSelectionDismissed(true)
+    } else {
+      setShowStoreSelection(true)
+    }
+  }, [])
+
+  const handleStoreSelection = (store: StoreInfo) => {
+    setSelectedStoreId(store.storeId)
+    setSelectedStoreName(store.storeName)
+    setStoreSelectionDismissed(false)
+    localStorage.setItem("storeId", store.storeId.toString())
+    localStorage.setItem("storeName", store.storeName)
+    localStorage.removeItem("storeSelectionDismissed")
+    setShowStoreSelection(false)
+    speakText(`Store changed to ${store.storeName}`)
+  }
+
+  const handleDismissStoreSelection = () => {
+    setShowStoreSelection(false)
+    setStoreSelectionDismissed(true)
+    localStorage.setItem("storeSelectionDismissed", "true")
+  }
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const recogRef = useRef<ISpeechRecognition | null>(null)
@@ -286,8 +326,51 @@ export default function VisuallyImpairedClient() {
   return (
     <div
       className="min-h-screen bg-gray-900 text-white"
-      onClick={appState === "idle" ? toggleCamera : undefined}
+      onClick={appState === "idle" && !showStoreSelection ? toggleCamera : undefined}
     >
+      {/* Store Selection Dialog */}
+      <Dialog
+        open={showStoreSelection}
+        onOpenChange={(open) => {
+          if (!open) handleDismissStoreSelection()
+        }}
+      >
+        <DialogContent className="bg-gray-800 text-white border-gray-700">
+          <DialogHeader>
+            <DialogTitle>Select Your Walmart Store</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-gray-300">Please choose the Walmart store you are entering:</p>
+            <StoreCombobox 
+              selectedStoreId={selectedStoreId} 
+              onSelectStore={handleStoreSelection}
+              buttonClassName="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
+              className="w-full bg-gray-700 border-gray-600 text-white"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Top Bar for Store Settings */}
+      <div className="bg-gray-800 border-b border-gray-700 p-4">
+        <div className="container mx-auto flex items-center justify-between">
+          <span className="text-gray-300">
+            Store: <span className="font-medium text-white">{selectedStoreId ? selectedStoreName : "None Selected"}</span>
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowStoreSelection(true)
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+          >
+            {selectedStoreId ? "Change Store" : "Select Store"}
+          </Button>
+        </div>
+      </div>
+
       <div className="container mx-auto px-4 py-8">
         {permissionError && (
           <Alert variant="destructive" className="mb-4">

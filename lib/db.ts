@@ -1,23 +1,12 @@
 // lib/db.ts
-import mysql from 'mysql2/promise';
+import { PrismaClient } from '@prisma/client';
 
 declare global {
-  // allow global pool across hot-reloads in dev
-  var __mysqlPool: mysql.Pool | undefined;
+  var prisma: PrismaClient | undefined;
 }
 
-if (!global.__mysqlPool) {
-  global.__mysqlPool = mysql.createPool({
-    host: process.env.NEXT_PUBLIC_DB_HOST,
-    user: process.env.NEXT_PUBLIC_DB_USER,
-    password: process.env.NEXT_PUBLIC_DB_PASSWORD,
-    database: process.env.NEXT_PUBLIC_DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0,
-  });
-}
+export const prisma = global.prisma || new PrismaClient();
 
-const pool = global.__mysqlPool;
+if (process.env.NODE_ENV !== 'production') global.prisma = prisma;
 
-export default pool;
+export default prisma;

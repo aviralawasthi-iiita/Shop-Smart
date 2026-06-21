@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  storeId         Int            @id @default(autoincrement())
+  storeName       String         @default("Walmart")
+  managerEmail    String         @unique
+  storeLocation   String
+  managerPassword String
+  announcements   Announcement[]
+  quietTimes      QuietTime[]
+
+  @@map("store")
+}
+
+model User {
+  userId     Int         @id @default(autoincrement())
+  userEmail  String      @unique
+  name       String
+  password   String
+  quietTimes QuietTime[]
+
+  @@map("user_table")
+}
+
+model Announcement {
+  id         Int      @id @default(autoincrement())
+  title      String
+  descrip    String?
+  storeId    Int
+  created_at DateTime @default(now())
+  
+  store      Store    @relation(fields: [storeId], references: [storeId])
+
+  @@map("announcement")
+}
+
+model QuietTime {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  storeId    Int
+  date       DateTime
+  timewindow String
+  reason     String?
+  status     String   @default("pending")
+  
+  user       User     @relation(fields: [userId], references: [userId])
+  store      Store    @relation(fields: [storeId], references: [storeId])
+
+  @@map("quiettime")
+}
+
+model OTP {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  code      String
+  expiresAt DateTime
+
+  @@map("otp")
+}

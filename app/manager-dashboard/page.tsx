@@ -20,7 +20,8 @@ export default function ManagerDashboardPage() {
         const res = await fetch('/api/manager/announcement');
         if (!res.ok) throw new Error(`Error: ${res.status}`);
         const data = await res.json();
-        setAnnouncements(data.announcements);
+        // The API returns the array directly, so data is the array
+        setAnnouncements(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error('Failed to fetch announcements:', err);
       }

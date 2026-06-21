@@ -4,9 +4,6 @@ import { Eye, Ear, Brain, ArrowRight } from "lucide-react"
 import ThemeToggle from "@/components/theme-toggle"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { useEffect } from "react"
-
-
 export default function Home() {
 
   return (

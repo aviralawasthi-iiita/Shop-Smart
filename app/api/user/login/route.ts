@@ -1,14 +1,6 @@
 // pages/api/user/login.ts
-import type { NextApiRequest, NextApiResponse } from 'next';
-import pool from '../../../../lib/db';
-import type { RowDataPacket } from 'mysql2';
+import prisma from '../../../../lib/db';
 import { NextRequest, NextResponse } from 'next/server';
-
-type User = {
-  userId: number;
-  userEmail: string;
-  name: string;
-};
 
 export async function POST(
   req: NextRequest,
@@ -19,24 +11,26 @@ export async function POST(
     password?: string;
   };
 
-  console.log('Received login request:', { userEmail, password });
   if (!userEmail || !password) {
     return NextResponse.json({ error: 'Email and password required' }, {status: 400});
   }
 
   try {
-    const [rows] = await pool.execute<RowDataPacket[]>(
-      `SELECT userId, userEmail, name
-       FROM user_table
-       WHERE userEmail = ? AND password = ?`,
-      [userEmail, password]
-    );
+    const user = await prisma.user.findFirst({
+      where: {
+        userEmail: userEmail,
+        password: password
+      },
+      select: {
+        userId: true,
+        userEmail: true,
+        name: true,
+      }
+    });
 
-    if (rows.length === 0) {
+    if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' },{status : 401});
     }
-
-    const user = rows[0] as User;
 
     return NextResponse.json(user);
   } catch (err) {

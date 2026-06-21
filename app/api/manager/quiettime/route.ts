@@ -1,5 +1,5 @@
 // pages/api/manager/quiettime.ts
-import pool from '../../../../lib/db';
+import prisma from '../../../../lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
 export type ManagerQuietTime = {
@@ -18,41 +18,27 @@ export async function GET(
 ) {
   if (req.method === 'GET') {
     const {searchParams} = new URL(req.url);
-    const storeId = Array.isArray(searchParams.get('storeId'))
-     ? Number(searchParams.get('storeId'))
-      : Number(searchParams.get('storeId'));
-    console.log('storeId:', storeId);
-    if (!storeId) {
+    const storeIdParam = searchParams.get('storeId');
+    const storeId = storeIdParam ? Number(storeIdParam) : NaN;
+    if (!storeId || isNaN(storeId)) {
       return NextResponse.json({ error: 'storeId query param required' },{status:400});
     }
 
     try {
-      const [rows] = await pool.execute<any[]>(
-        `SELECT 
-           q.id,
-           q.userId,
-           u.name AS userName,
-           s.storeLocation,
-           DATE_FORMAT(q.date, '%Y-%m-%d') AS date,
-           q.timewindow AS timeWindow,
-           q.reason,
-           q.status
-         FROM quiettime q
-         JOIN user_table u ON q.userId = u.userId
-         JOIN store s ON q.storeId = s.storeId
-         WHERE q.storeId = ?`,
-        [storeId]
-      );
+      const quietTimes = await prisma.quietTime.findMany({
+        where: { storeId },
+        include: { user: true, store: true }
+      });
 
-      const formatted: ManagerQuietTime[] = rows.map(r => ({
-        id: r.id,
-        userId: r.userId,
-        userName: r.userName,
-        storeLocation: r.storeLocation,
-        date: r.date,
-        timeWindow: r.timeWindow,
-        reason: r.reason,
-        status: r.status,
+      const formatted: ManagerQuietTime[] = quietTimes.map(q => ({
+        id: q.id.toString(),
+        userId: q.userId.toString(),
+        userName: q.user.name,
+        storeLocation: q.store.storeLocation,
+        date: q.date.toISOString().split('T')[0],
+        timeWindow: q.timewindow,
+        reason: q.reason || '',
+        status: q.status as 'pending' | 'approved' | 'rejected',
       }));
 
       return NextResponse.json(formatted,{status:200});
@@ -61,9 +47,6 @@ export async function GET(
       return NextResponse.json({ error: 'DB error' },{status:500});
     }
   }
-
-  
-
 }
 
 export async function PUT(req: NextRequest){
@@ -77,20 +60,17 @@ export async function PUT(req: NextRequest){
     }
 
     try {
-      const [result] = await pool.execute<any>(
-        `UPDATE quiettime
-         SET status = ?
-         WHERE id = ?`,
-        [status, id]
-      );
-
-      if (result.affectedRows === 0) {
-        return NextResponse.json({ error: 'Not found' },{status : 404});
-      }
+      const updated = await prisma.quietTime.update({
+        where: { id },
+        data: { status }
+      });
 
       return NextResponse.json({ message: 'Updated' },{status : 200});
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      if (err.code === 'P2025') {
+        return NextResponse.json({ error: 'Not found' },{status : 404});
+      }
       return NextResponse.json({ error: 'DB error' },{status : 500});
     }
   }

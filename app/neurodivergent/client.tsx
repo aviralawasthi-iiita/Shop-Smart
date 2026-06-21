@@ -4,6 +4,7 @@ import { DialogFooter } from "@/components/ui/dialog"
 
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
+import Link from "next/link"
 import { PlusCircle, Check, Clock, Bell, CalendarClock, RotateCcw, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
@@ -14,6 +15,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
+import { ChevronsUpDown } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { StoreCombobox } from "@/components/store-combobox"
 
 // Types
 interface ShoppingItem {
@@ -46,6 +52,12 @@ interface LoginResponse {
   userId: number
   userEmail: string
   quietRequests: QuietTimeRequest[]
+}
+
+interface StoreInfo {
+  storeId: number
+  storeName: string
+  storeLocation: string
 }
 
 export default function NeurodivergentClient({setIsLoggedIn}:{setIsLoggedIn: (isLoggedIn: boolean) => void}) {
@@ -95,16 +107,29 @@ export default function NeurodivergentClient({setIsLoggedIn}:{setIsLoggedIn: (is
   const [timeWindow, setTimeWindow] = useState("")
   const [requestReason, setRequestReason] = useState("")
   const [requestSuccess, setRequestSuccess] = useState(false)
+  const [stores, setStores] = useState<StoreInfo[]>([])
+  const [storeComboboxOpen, setStoreComboboxOpen] = useState(false)
+
+  // Fetch stores on mount
+  useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        const res = await fetch('/api/stores')
+        if (res.ok) {
+          const data = await res.json()
+          setStores(data)
+        }
+      } catch (err) {
+        console.error("Failed to fetch stores", err)
+      }
+    }
+    fetchStores()
+  }, [])
 
   // Common emojis for shopping
   const commonEmojis = ["🛒", "🥕", "🥩", "🍎", "🥛", "🧀", "🍞", "🧻", "🧼", "💊", "📱"]
 
-  // Store mapping for API calls
-  const storeMapping: { [key: string]: number } = {
-    "walmart-supercenter-main-st": 1,
-    "walmart-neighborhood-oak-ave": 2,
-    "walmart-supercenter-river-rd": 3,
-  }
+  // Store mapping removed as backend now handles dynamic stores
 
   // Add CircularProgress component
   const CircularProgress = ({ progress, size = 40 }: { progress: number; size?: number }) => {
@@ -155,7 +180,6 @@ export default function NeurodivergentClient({setIsLoggedIn}:{setIsLoggedIn: (is
 
   // Load user data from API
   const loadUserData = async (userId: number) => {
-    console.log(userId);
     try {
       const response = await fetch(`/api/user/quiettime?userId=${userId}`)
       if (response.ok) {
@@ -335,7 +359,6 @@ export default function NeurodivergentClient({setIsLoggedIn}:{setIsLoggedIn: (is
       setIsLoading(true)
 
       try {
-        const storeId = storeMapping[storeLocation]
         const response = await fetch("/api/user/quiettime", {
           method: "POST",
           headers: {
@@ -343,7 +366,7 @@ export default function NeurodivergentClient({setIsLoggedIn}:{setIsLoggedIn: (is
           },
           body: JSON.stringify({
             userId: userId,
-            storeId: storeId,
+            storeLocation: storeLocation,
             date: requestDate,
             timeWindow: timeWindow,
             reason: requestReason,
@@ -465,8 +488,14 @@ export default function NeurodivergentClient({setIsLoggedIn}:{setIsLoggedIn: (is
               </Button>
             </form>
           </CardContent>
-          <CardFooter className="flex justify-center">
+          <CardFooter className="flex flex-col items-center gap-2 border-t p-4">
             <p className="text-sm text-muted-foreground">Enter your credentials to continue</p>
+            <p className="text-sm text-muted-foreground">
+              Don't have an account?{" "}
+              <Link href="/student-register" className="text-primary hover:underline">
+                Register here
+              </Link>
+            </p>
           </CardFooter>
         </Card>
       </div>
@@ -709,24 +738,14 @@ export default function NeurodivergentClient({setIsLoggedIn}:{setIsLoggedIn: (is
             </CardHeader>
             <CardContent>
               <form onSubmit={submitQuietTimeRequest} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="store-location">Walmart Store Location</Label>
-                  <Select value={storeLocation} onValueChange={setStoreLocation} required disabled={isLoading}>
-                    <SelectTrigger id="store-location">
-                      <SelectValue placeholder="Select your Walmart store" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="walmart-supercenter-main-st">
-                        Walmart Supercenter - 123 Main St, Springfield
-                      </SelectItem>
-                      <SelectItem value="walmart-neighborhood-oak-ave">
-                        Walmart Neighborhood Market - 456 Oak Ave, Springfield
-                      </SelectItem>
-                      <SelectItem value="walmart-supercenter-river-rd">
-                        Walmart Supercenter - 789 River Rd, Springfield
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-2 flex flex-col">
+                  <Label htmlFor="store-location">Walmart Store</Label>
+                  <StoreCombobox 
+                    selectedStoreId={stores.find(s => s.storeLocation === storeLocation)?.storeId || null}
+                    onSelectStore={(store) => setStoreLocation(store.storeLocation)}
+                    buttonClassName="w-full"
+                    className="w-[400px]"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="request-date">Date</Label>
