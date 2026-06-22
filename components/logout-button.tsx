@@ -11,6 +11,7 @@ export default function LogoutButton({isLoggedIn}:{isLoggedIn: boolean}) {
     // Remove user data from localStorage
     localStorage.removeItem("userEmail")
     localStorage.removeItem("userId")
+    localStorage.removeItem("managerDetails")
 
     // Optionally redirect to login or home page
     router.push("/")

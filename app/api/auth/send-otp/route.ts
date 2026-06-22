@@ -35,12 +35,12 @@ export async function POST(req: NextRequest) {
     const mailOptions = {
       from: process.env.SMTP_EMAIL,
       to: email,
-      subject: "Your Walmart Assist Verification Code",
+      subject: "Your ShopSmart Verification Code",
       text: `Your OTP verification code is: ${code}\nThis code will expire in 10 minutes.`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-          <h2 style="color: #0071ce;">Walmart Assist Verification</h2>
-          <p>You recently requested to register for a Walmart Assist account.</p>
+          <h2 style="color: #0071ce;">ShopSmart Verification</h2>
+          <p>You recently requested to register for a ShopSmart account.</p>
           <p>Your verification code is:</p>
           <div style="background-color: #f8fafc; padding: 15px; border-radius: 5px; text-align: center; margin: 20px 0;">
             <h1 style="letter-spacing: 5px; color: #0f172a; margin: 0;">${code}</h1>
@@ -50,7 +50,15 @@ export async function POST(req: NextRequest) {
       `,
     };
 
-    await transporter.sendMail(mailOptions);
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (mailError) {
+      console.warn("==================================================");
+      console.warn("SMTP EMAIL NOT CONFIGURING OR SEND FAILED!");
+      console.warn(`SIMULATED REGISTRATION CODE FOR ${email}: ${code}`);
+      console.warn("==================================================");
+      console.log(mailError);
+    }
 
     return NextResponse.json({ message: "OTP sent successfully" });
   } catch (error: any) {

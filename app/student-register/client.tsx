@@ -62,8 +62,8 @@ export default function StudentRegisterClient() {
         throw new Error(data.message || "Failed to register")
       }
 
-      // Success, redirect to student dashboard/login
-      router.push("/neurodivergent")
+      // Success, redirect to home
+      router.push("/")
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
     } finally {
@@ -151,7 +151,7 @@ export default function StudentRegisterClient() {
         <CardFooter className="flex justify-center border-t p-4">
           <p className="text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/neurodivergent" className="text-primary hover:underline">
+            <Link href="/" className="text-primary hover:underline">
               Log in
             </Link>
           </p>

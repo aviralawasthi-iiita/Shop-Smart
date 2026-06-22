@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const sessionId = crypto.randomUUID();
     const history: any[] = [
-      new SystemMessage("You are an accessible Walmart Assistant for visually impaired users. Describe the image clearly and concisely, focusing on products or store layouts. Keep responses short and helpful.")
+      new SystemMessage("You are an accessible retail assistant for visually impaired users. Describe the image clearly and concisely, focusing on products or store layouts. Keep responses short and helpful.")
     ];
 
     const message = new HumanMessage({

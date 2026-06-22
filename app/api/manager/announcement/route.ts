@@ -1,5 +1,6 @@
 import prisma from '../../../../lib/db';
 import { NextRequest, NextResponse } from 'next/server';
+import { producer } from '@/lib/kafka';
 
 export async function POST(
   req: NextRequest,
@@ -22,6 +23,23 @@ export async function POST(
           storeId
         }
       });
+
+      // Produce event to Kafka
+      await producer.send({
+        topic: "store-announcements",
+        messages: [
+          {
+            value: JSON.stringify({
+              id: announcement.id,
+              title: announcement.title,
+              descrip: announcement.descrip,
+              storeId: announcement.storeId,
+              createdAt: announcement.created_at,
+            }),
+          },
+        ],
+      });
+
       return NextResponse.json({ insertedId: announcement.id }, {status : 201});
     } catch (err) {
       console.error(err);

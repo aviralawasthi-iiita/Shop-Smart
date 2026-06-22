@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2 } from "lucide-react"
+import { Loader2, ArrowLeft } from "lucide-react"
 
 export default function ManagerLoginClient() {
   const [email, setEmail] = useState("")
@@ -17,6 +17,19 @@ export default function ManagerLoginClient() {
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+ 
+  // Skip login if manager details are already in localStorage
+  useEffect(() => {
+    const managerDetailsStr = localStorage.getItem("managerDetails")
+    if (managerDetailsStr) {
+      try {
+        JSON.parse(managerDetailsStr)
+        router.push("/manager-dashboard")
+      } catch (e) {
+        localStorage.removeItem("managerDetails")
+      }
+    }
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,7 +58,7 @@ export default function ManagerLoginClient() {
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || "Login failed")
+        throw new Error(data.error || data.message || "Login failed")
       }
 
       // Save manager details to localStorage
@@ -61,7 +74,14 @@ export default function ManagerLoginClient() {
   }
 
   return (
-    <div className="flex justify-center">
+    <div className="flex flex-col items-center justify-center min-h-[70vh] w-full px-4">
+      <Link
+        href="/"
+        className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6 max-w-md w-full"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        <span>Back to Homepage</span>
+      </Link>
       <Card className="w-full max-w-md rounded-2xl">
         <CardHeader>
           <CardTitle>Manager Login</CardTitle>
@@ -79,7 +99,7 @@ export default function ManagerLoginClient() {
               <Input
                 id="email"
                 type="email"
-                placeholder="manager@walmart.com"
+                placeholder="manager@shopsmart.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isLoading}

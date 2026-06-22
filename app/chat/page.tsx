@@ -4,7 +4,7 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-screen max-w-3xl mx-auto p-4 md:p-6 text-sidebar-foreground">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight">Walmart Assistant</h1>
+        <h1 className="text-3xl font-bold tracking-tight">ShopSmart Assistant</h1>
         <p className="text-muted-foreground">Powered by LangChain & Gemini AI</p>
       </header>
 

@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Walmart Assist",
-    short_name: "WalmartAssist",
+    name: "ShopSmart",
+    short_name: "ShopSmart",
     description: "Empowering Inclusive Shopping",
     start_url: "/",
     display: "standalone",

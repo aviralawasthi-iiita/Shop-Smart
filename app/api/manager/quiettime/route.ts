@@ -3,7 +3,7 @@ import prisma from '../../../../lib/db';
 import { NextRequest, NextResponse } from 'next/server';
 
 export type ManagerQuietTime = {
-  id: string;
+  id: number;
   userId: string;
   userName: string;
   storeLocation: string;
@@ -31,7 +31,7 @@ export async function GET(
       });
 
       const formatted: ManagerQuietTime[] = quietTimes.map(q => ({
-        id: q.id.toString(),
+        id: q.id,
         userId: q.userId.toString(),
         userName: q.user.name,
         storeLocation: q.store.storeLocation,

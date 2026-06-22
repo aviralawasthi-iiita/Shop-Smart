@@ -42,7 +42,7 @@ export async function POST(
       if (!store) {
         store = await prisma.store.create({
           data: {
-            managerEmail: `dummy_${Date.now()}@walmart.com`,
+            managerEmail: `dummy_${Date.now()}@shopsmart.com`,
             storeLocation: storeLocation,
             managerPassword: "dummy",
           }
@@ -58,6 +58,34 @@ export async function POST(
           reason: reason || null
         }
       });
+
+      // Retrieve user details to publish correct userName
+      const dbUser = await prisma.user.findUnique({
+        where: { userId }
+      });
+      const userName = dbUser ? dbUser.name : "Customer";
+
+      // Produce quiet time request to Kafka
+      const { producer } = await import("@/lib/kafka");
+      await producer.send({
+        topic: "store-requests",
+        messages: [
+          {
+            value: JSON.stringify({
+              id: quietTime.id,
+              userId: userId.toString(),
+              userName,
+              storeLocation: store.storeLocation,
+              date: quietTime.date.toISOString().split('T')[0],
+              timeWindow: quietTime.timewindow,
+              reason: quietTime.reason || '',
+              status: "pending",
+              storeId: quietTime.storeId
+            }),
+          },
+        ],
+      });
+
       return NextResponse.json({ insertedId: quietTime.id },{status: 201});
     } catch (err) {
       console.error(err);

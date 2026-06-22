@@ -7,7 +7,7 @@ import ClientRootLayout from "./client-layout" // Change from "/app/ClientRootLa
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Walmart Assist",
+  title: "ShopSmart",
   description: "Empowering Inclusive Shopping",
   manifest: "/manifest.json",
     generator: 'v0.dev'

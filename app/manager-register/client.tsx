@@ -166,7 +166,7 @@ export default function ManagerRegisterClient() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="manager@walmart.com"
+                placeholder="manager@shopsmart.com"
                 required
               />
             </div>
@@ -176,7 +176,7 @@ export default function ManagerRegisterClient() {
                 id="storeName"
                 value={storeName}
                 onChange={(e) => setStoreName(e.target.value)}
-                placeholder="Walmart Neighborhood Market"
+                placeholder="ShopSmart Neighborhood Market"
                 required
               />
             </div>
