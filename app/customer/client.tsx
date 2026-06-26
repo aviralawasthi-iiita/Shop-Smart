@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
-import { Mic, MicOff, Camera, CameraOff, Loader2, X, ArrowLeft } from "lucide-react"
+import { Mic, MicOff, Camera, CameraOff, Loader2, X, ArrowLeft, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -11,25 +11,35 @@ import Link from "next/link"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // --- Custom Hook for Typewriter Effect ---
 const useTypewriter = (text: string, speed = 50) => {
   const [displayText, setDisplayText] = useState("")
+
   useEffect(() => {
     let cancelled = false
-    setDisplayText("")
-    if (text) {
-      const typeChar = (index: number) => {
-        if (cancelled) return
-        if (index < text.length) {
-          setDisplayText(text.slice(0, index + 1))
-          setTimeout(() => typeChar(index + 1), speed)
+    
+    setDisplayText((prev) => text.startsWith(prev) ? prev : "")
+
+    const interval = setInterval(() => {
+      setDisplayText((current) => {
+        if (current.length < text.length && text.startsWith(current)) {
+          return text.slice(0, current.length + 1)
         }
-      }
-      typeChar(0)
+        if (!text.startsWith(current)) {
+          return ""
+        }
+        return current
+      })
+    }, speed)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
     }
-    return () => { cancelled = true }
   }, [text, speed])
+  
   return displayText
 }
 
@@ -67,6 +77,21 @@ export default function CustomerClient() {
   const streamRef = useRef<MediaStream | null>(null)
   const [isMicOn, setIsMicOn] = useState(false)
   const [inputText, setInputText] = useState("")
+  const [chatMode, setChatMode] = useState<"follow_up" | "new_chat">("new_chat")
+  const [isTtsEnabled, setIsTtsEnabled] = useState(true)
+  const ttsEnabledRef = useRef(true)
+
+  const toggleTts = () => {
+    setIsTtsEnabled(prev => {
+      const next = !prev;
+      ttsEnabledRef.current = next;
+      if (!next && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel()
+      }
+      return next;
+    })
+  }
+
   const [apiResponse, setApiResponse] = useState(
     "Welcome! Tap the screen, use the chat, or open the camera to begin."
   )
@@ -248,16 +273,16 @@ export default function CustomerClient() {
 
   const speakText = (text: string): Promise<void> => {
     return new Promise((resolve) => {
-      if (!("speechSynthesis" in window)) {
+      if (!("speechSynthesis" in window) || !ttsEnabledRef.current) {
         resolve()
         return
       }
       window.speechSynthesis.cancel()
       const utterance = new SpeechSynthesisUtterance(text)
-      
+
       utterance.onend = () => resolve()
       utterance.onerror = () => resolve()
-      
+
       utterance.voice =
         femaleVoice ||
         window.speechSynthesis
@@ -284,6 +309,7 @@ export default function CustomerClient() {
       try {
         recogRef.current.start()
         toast.success("Microphone on. Listening...")
+        speakText("Microphone on.")
       } catch (e) {
         console.error(e)
       }
@@ -294,6 +320,7 @@ export default function CustomerClient() {
       try {
         recogRef.current.stop()
         toast.info("Microphone off.")
+        speakText("Microphone off.")
       } catch (e) {
         console.error(e)
       }
@@ -307,7 +334,7 @@ export default function CustomerClient() {
     if (!videoRef.current || appState === "awaiting_capture") return
     setAppState("awaiting_capture")
     setCountdown(3)
-    
+
     let counter = 3
     const interval = setInterval(() => {
       counter -= 1
@@ -335,56 +362,67 @@ export default function CustomerClient() {
         if (!blob) return
         isProcessingApiCall.current = true
         try {
+          const base64Image = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+
           // Step 1: Analyze Image
           const formData = new FormData()
           formData.append("image", blob, "capture.jpg")
           formData.append("storeId", selectedStoreId?.toString() || "0")
-          
+
           const analyzeRes = await fetch(`/api/ai/analyze-image`, {
             method: "POST",
             body: formData,
           })
           const analyzeData = await analyzeRes.json()
           if (!analyzeRes.ok) throw new Error(analyzeData.detail)
-          
+
           let intermediateText = "";
-          if (analyzeData.productType) {
-            intermediateText = `I have analysed the product and it is a "${analyzeData.productType}".`;
+          if (analyzeData.searchTerms && analyzeData.searchTerms.length > 0) {
+            intermediateText = `I have analysed the product and it is likely "${analyzeData.searchTerms.join(", ")}".`;
           } else {
             intermediateText = `I have analysed the product but could not match it to our inventory.`;
           }
-          
-          setApiResponse(intermediateText);
+
+          setApiResponse(intermediateText)
           const speechPromise = speakText(intermediateText);
-          
+
           // Step 2: Final Answer
-          const userQuery = "Analyze this image. Tell me what product it is, if we have it in stock, and its price. Are there any cheaper alternatives?";
-          
+          const userQuery = `The user showed an image of "${analyzeData.searchTerms?.join(", ") || "an unknown product"}". Please tell them if we have it in stock, its price, and if there are any cheaper alternatives based on the inventory context provided.`;
+
           const answerRes = await fetch(`/api/chat/answer`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-              question: userQuery, 
-              session_id: sessionId, 
+            body: JSON.stringify({
+              question: userQuery,
+              session_id: sessionId,
               storeId: selectedStoreId,
               isProductQuery: true,
-              productType: analyzeData.productType
+              searchTerms: analyzeData.searchTerms || [],
+              base64Image: base64Image
             }),
           })
           const answerData = await answerRes.json()
           if (!answerRes.ok) throw new Error(answerData.detail)
-          
+
           await speechPromise; // Wait for the first message to finish speaking
-          
+
           setSessionId(answerData.session_id)
+          if (chatMode === "new_chat") setChatMode("follow_up")
           const finalFullText = intermediateText + "\n\n" + answerData.response;
           setApiResponse(finalFullText)
           speakText(answerData.response) // Speak the final part
-          
+
           setAppState("image_session_active")
         } catch (e) {
           console.error(e)
-          setApiResponse("Sorry, I couldn't analyze the image.")
+          const errorMsg = "Sorry, I couldn't analyze the image.";
+          setApiResponse(errorMsg)
+          speakText(errorMsg)
           setAppState("image_session_active")
         } finally {
           isProcessingApiCall.current = false
@@ -394,10 +432,12 @@ export default function CustomerClient() {
     )
   }
 
-  // --- Follow-up (manual mic) ---
   const handleFollowUpQuestion = async (text: string) => {
     if (!text.trim()) return
-    setInputText(text) // Keep the text in the input box
+    setInputText("") // Clear the text in the input box
+    
+    let currentSessionId = chatMode === "follow_up" ? sessionId : null;
+
     setApiResponse("Thinking...")
     setAppState("processing_chat")
     isProcessingApiCall.current = true
@@ -407,16 +447,16 @@ export default function CustomerClient() {
       const analyzeRes = await fetch(`/api/chat/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: text, storeId: selectedStoreId }),
+        body: JSON.stringify({ question: text, storeId: selectedStoreId, session_id: currentSessionId }),
       })
       const analyzeData = await analyzeRes.json()
       if (!analyzeRes.ok) throw new Error(analyzeData.detail)
-      
+
       let intermediateText = "";
-      if (analyzeData.isProductQuery && analyzeData.productType) {
-        intermediateText = `I have analysed your query and you are asking about a "${analyzeData.productType}".`;
+      if (analyzeData.isProductQuery && analyzeData.searchTerms && analyzeData.searchTerms.length > 0) {
+        intermediateText = `I have analysed your query and you are asking about "${analyzeData.searchTerms.join(', ')}".`;
       }
-      
+
       let speechPromise = Promise.resolve();
       if (intermediateText) {
         setApiResponse(intermediateText);
@@ -425,34 +465,36 @@ export default function CustomerClient() {
         setApiResponse("Thinking...");
       }
 
-      // Step 2: Answer
       const answerRes = await fetch(`/api/chat/answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          question: text, 
-          session_id: sessionId, 
+        body: JSON.stringify({
+          question: text,
+          session_id: currentSessionId,
           storeId: selectedStoreId,
           isProductQuery: analyzeData.isProductQuery,
-          productType: analyzeData.productType
+          searchTerms: analyzeData.searchTerms
         }),
       })
       const answerData = await answerRes.json()
       if (!answerRes.ok) throw new Error(answerData.detail)
-      
+
       await speechPromise; // Wait for the first message to finish
-      
+
       if (answerData.session_id) setSessionId(answerData.session_id);
-      
+      if (chatMode === "new_chat") setChatMode("follow_up");
+
       const finalFullText = intermediateText ? intermediateText + "\n\n" + answerData.response : answerData.response;
       setApiResponse(finalFullText);
-      
+
       speakText(answerData.response);
-      
+
       setAppState(isCameraOn ? "image_session_active" : "general_listening")
     } catch (e) {
       console.error(e)
-      setApiResponse("Sorry, something went wrong.")
+      const errorMsg = "Sorry, something went wrong. Please try again.";
+      setApiResponse(errorMsg)
+      speakText(errorMsg)
     } finally {
       isProcessingApiCall.current = false
     }
@@ -468,9 +510,11 @@ export default function CustomerClient() {
       setIsCameraOn(true)
       setSessionId(null)
       toast.success("Camera started. Click 'Capture Photo' to analyze.")
+      speakText("Camera started.")
       setAppState("image_session_active")
     } catch {
       setPermissionError("Camera access denied.")
+      speakText("Camera access denied.")
     }
   }
   const stopCamera = () => {
@@ -484,6 +528,7 @@ export default function CustomerClient() {
     setIsCameraOn(false)
     setSessionId(null)
     toast.info("Camera off.")
+    speakText("Camera off.")
     setAppState("general_listening")
   }
   const toggleCamera = () => {
@@ -546,8 +591,8 @@ export default function CustomerClient() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-gray-300">Please choose the store you are entering:</p>
-            <StoreCombobox 
-              selectedStoreId={selectedStoreId} 
+            <StoreCombobox
+              selectedStoreId={selectedStoreId}
               onSelectStore={handleStoreSelection}
               buttonClassName="w-full bg-gray-700 border-gray-600 text-white hover:bg-gray-600"
               className="w-full bg-gray-700 border-gray-600 text-white"
@@ -578,7 +623,7 @@ export default function CustomerClient() {
             ) : (
               <>
                 <p className="text-sm text-gray-300">
-                  Please details your complaint for <span className="font-bold text-white">{selectedStoreName}</span>. 
+                  Please details your complaint for <span className="font-bold text-white">{selectedStoreName}</span>.
                   The store manager will review it.
                 </p>
                 <div className="space-y-2">
@@ -649,13 +694,13 @@ export default function CustomerClient() {
             )}
           </div>
           <div className="flex justify-end pt-4 border-t border-gray-700">
-             <Button
-                variant="outline"
-                onClick={() => setShowRecentAnnouncementsDialog(false)}
-                className="bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-              >
-                Close
-              </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowRecentAnnouncementsDialog(false)}
+              className="bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+            >
+              Close
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -774,6 +819,18 @@ export default function CustomerClient() {
                       <MicOff className="h-5 w-5 text-red-400" />
                     )}
                   </Button>
+                  <Button
+                    size="lg"
+                    className="rounded-full bg-gray-600 hover:bg-gray-700"
+                    onClick={(e) => { e.stopPropagation(); toggleTts(); }}
+                    aria-label={isTtsEnabled ? "Mute TTS" : "Unmute TTS"}
+                  >
+                    {isTtsEnabled ? (
+                      <Volume2 className="h-5 w-5 text-blue-400" />
+                    ) : (
+                      <VolumeX className="h-5 w-5 text-red-400" />
+                    )}
+                  </Button>
 
                 </div>
 
@@ -816,6 +873,15 @@ export default function CustomerClient() {
                       Your Question:
                     </h3>
                     <div className="flex items-center space-x-3 relative">
+                      <Select value={chatMode} onValueChange={(val: any) => setChatMode(val)}>
+                        <SelectTrigger className="w-[140px] bg-gray-900 border-gray-700 text-white rounded-lg h-[58px]">
+                          <SelectValue placeholder="Mode" />
+                        </SelectTrigger>
+                        <SelectContent side="top" className="bg-gray-800 border-gray-700 text-white">
+                          <SelectItem value="follow_up">Follow Up</SelectItem>
+                          <SelectItem value="new_chat">New Chat</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <input
                         type="text"
                         value={inputText}

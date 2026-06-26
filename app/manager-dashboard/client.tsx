@@ -21,7 +21,7 @@ import { Label } from "@/components/ui/label"
 import { useRouter } from "next/navigation"
 
 // Types
-interface QuietTimeRequest {
+interface Complaint {
   id: number
   userId: string
   userName: string
@@ -53,7 +53,7 @@ interface ManagerDashboardClientProps {
 }
 
 export default function ManagerDashboardClient({ announcements, setAnnouncements }: ManagerDashboardClientProps) {
-  const [requests, setRequests] = useState<QuietTimeRequest[]>([])
+  const [requests, setRequests] = useState<Complaint[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
   const [updatingRequestId, setUpdatingRequestId] = useState<number | null>(null)
@@ -86,7 +86,7 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
     try {
       const manager: ManagerDetails = JSON.parse(managerDetailsStr)
       setManagerDetails(manager)
-      fetchQuietTimeRequests(manager.storeId)
+      fetchComplaints(manager.storeId)
     } catch (err) {
       setError("Invalid manager session. Please login again.")
       router.push("/manager-login")
@@ -121,19 +121,19 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
     }
   }, [managerDetails?.storeId])
 
-  // Fetch quiet time requests from API
-  const fetchQuietTimeRequests = async (storeId: number) => {
+  // Fetch complaints from API
+  const fetchComplaints = async (storeId: number) => {
     try {
       setIsLoading(true)
       setError("")
-      const response = await fetch(`/api/manager/quiettime?storeId=${storeId}`)
+      const response = await fetch(`/api/manager/complaints?storeId=${storeId}`)
       if (!response.ok) {
-        throw new Error("Failed to fetch quiet time requests")
+        throw new Error("Failed to fetch complaints")
       }
       const data = await response.json()
       setRequests(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred while fetching requests")
+      setError(err instanceof Error ? err.message : "An error occurred while fetching complaints")
     } finally {
       setIsLoading(false)
     }
@@ -144,7 +144,7 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
     try {
       setUpdatingRequestId(id)
       setError("")
-      const response = await fetch("/api/manager/quiettime", {
+      const response = await fetch("/api/manager/complaints", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -261,7 +261,7 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="flex items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading quiet time requests...</span>
+          <span>Loading complaints...</span>
         </div>
       </div>
     )
@@ -412,9 +412,9 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CalendarClock className="h-5 w-5" />
-                Pending Quiet Time Requests
+                Pending Complaints
               </CardTitle>
-              <CardDescription>Review and approve or reject customer requests</CardDescription>
+              <CardDescription>Review and approve or reject customer complaints</CardDescription>
             </CardHeader>
             <CardContent>
               {pendingRequests.length === 0 ? (
@@ -428,7 +428,7 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium">{request.userName}</h3>
                             <Badge variant={request.timeWindow === "Complaint" ? "destructive" : "secondary"}>
-                              {request.timeWindow === "Complaint" ? "Complaint" : "Quiet Time"}
+                              Complaint
                             </Badge>
                           </div>
                           <Badge>Pending</Badge>
@@ -480,7 +480,7 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
           <Card className="rounded-2xl">
             <CardHeader>
               <CardTitle>Approved Requests</CardTitle>
-              <CardDescription>Quiet time requests that have been approved</CardDescription>
+              <CardDescription>Complaints that have been marked as resolved/approved</CardDescription>
             </CardHeader>
             <CardContent>
               {approvedRequests.length === 0 ? (
@@ -494,7 +494,7 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium">{request.userName}</h3>
                             <Badge variant={request.timeWindow === "Complaint" ? "destructive" : "secondary"}>
-                              {request.timeWindow === "Complaint" ? "Complaint" : "Quiet Time"}
+                              Complaint
                             </Badge>
                           </div>
                           <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/50">
@@ -519,7 +519,7 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
           <Card className="rounded-2xl">
             <CardHeader>
               <CardTitle>Rejected Requests</CardTitle>
-              <CardDescription>Quiet time requests that have been rejected</CardDescription>
+              <CardDescription>Complaints that have been dismissed/rejected</CardDescription>
             </CardHeader>
             <CardContent>
               {rejectedRequests.length === 0 ? (
@@ -533,7 +533,7 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
                           <div className="flex items-center gap-2">
                             <h3 className="font-medium">{request.userName}</h3>
                             <Badge variant={request.timeWindow === "Complaint" ? "destructive" : "secondary"}>
-                              {request.timeWindow === "Complaint" ? "Complaint" : "Quiet Time"}
+                              Complaint
                             </Badge>
                           </div>
                           <Badge variant="outline" className="bg-red-500/10 text-red-500 border-red-500/50">

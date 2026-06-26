@@ -5,7 +5,7 @@ import { z } from "zod";
 import db from "@/lib/db";
 
 const extractionSchema = z.object({
-  productType: z.string().describe("The exact product type from the provided list that matches the image. If it is not in the list, just return the name of the product as closely as possible."),
+  searchTerms: z.array(z.string()).describe("Return 1 or more exact product types from the provided 'available product types' list that best match the image. If unsure, return multiple broad guesses. Do not invent new types."),
 });
 
 export async function POST(req: NextRequest) {
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         content: [
           {
             type: "text",
-            text: `Analyze this image. The available product types in our store are: ${availableTypes}. Please identify which of these exact product types best matches the image. Return only the exact string. If none match perfectly, return the closest one or empty string.`,
+            text: `Analyze this image. The available product types in our store are: ${availableTypes}. Please identify which of these exact product types best matches the image. Return 1 or more exact strings as searchTerms.`,
           },
           {
             type: "image_url",
@@ -67,10 +67,10 @@ export async function POST(req: NextRequest) {
       throw new Error("Failed to extract structured data from image.");
     }
 
-    const { productType } = extractionResult;
+    const { searchTerms } = extractionResult;
 
     return NextResponse.json({
-      productType: productType || "",
+      searchTerms: searchTerms || [],
       isProductQuery: true
     });
   } catch (error: any) {

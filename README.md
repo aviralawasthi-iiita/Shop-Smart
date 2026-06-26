@@ -6,8 +6,9 @@ Shop-Smart is a cutting-edge full-stack Next.js web application designed to revo
 
 ### 1. Unified AI Shopping Assistant
 A single, intuitive interface (`/customer`) that dynamically adapts to how users want to interact:
-- **Visual Product Analysis**: Customers can point their device camera at any item. Using **Google Gemini Vision**, the app instantly analyzes the image, identifies the product type, and matches it with the store's current inventory.
-- **Voice & Chat Interface**: Built-in browser `SpeechRecognition` actively listens to natural language queries (e.g., "Do you have this in medium?", "Where are the cheaper alternatives?"). Powered by **LangChain** and **Google Gemini**, the AI returns highly contextual answers.
+- **Visual Product Analysis**: Customers can point their device camera at any item. Using **Google Gemini Vision**, the app instantly analyzes the image, identifies the product type, and matches it with the store's current inventory. The AI intelligently recommends functionally similar alternatives with detailed reasoning.
+- **Context-Aware Voice & Chat**: Built-in browser `SpeechRecognition` actively listens to natural language queries. Powered by **LangChain** and **Google Gemini**, the AI returns highly contextual answers and maintains conversation history (session state). It handles complex follow-up questions gracefully, switching topics naturally if the user asks for a different category.
+- **Seamless Chat Modes**: The UI automatically manages the conversation flow, defaulting to "New Chat" and smoothly transitioning into a "Follow Up" state after an initial message or image scan.
 - **Auditory Feedback**: Text-to-Speech synthesis reads the AI's responses aloud, enabling a completely hands-free and accessible in-store experience.
 
 ### 2. Real-Time Shopify Inventory Sync

@@ -10,30 +10,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Store ID and complaint text are required" }, { status: 400 });
     }
 
-    // Find or create the default user for customer submissions
-    const user = await prisma.user.upsert({
-      where: { userEmail: "customer@assist.com" },
-      update: {},
-      create: {
-        userEmail: "customer@assist.com",
-        name: "Anonymous Customer",
-        password: "customer-dummy-password",
-      },
-    });
-
     // Lookup store details
     const store = await prisma.store.findUnique({
       where: { storeId: Number(storeId) }
     });
-    const storeLocation = store ? store.storeLocation : "Unknown Store";
+    
+    if (!store) {
+      return NextResponse.json({ error: "Store not found" }, { status: 404 });
+    }
+    const storeLocation = store.storeLocation;
 
-    // Create the complaint record in the QuietTime table representing a store action/complaint
-    const newComplaint = await prisma.quietTime.create({
+    // Create the complaint record in the new Complaint table
+    const newComplaint = await prisma.complaint.create({
       data: {
-        userId: user.userId,
         storeId: Number(storeId),
         date: new Date(),
-        timewindow: "Complaint",
         reason: complaint,
         status: "pending",
       },
@@ -46,12 +37,11 @@ export async function POST(req: NextRequest) {
         {
           value: JSON.stringify({
             id: newComplaint.id,
-            userId: user.userId.toString(),
-            userName: user.name,
+            userName: "Anonymous Customer",
             storeLocation: storeLocation,
             date: newComplaint.date.toISOString().split('T')[0],
             timeWindow: "Complaint",
-            reason: newComplaint.reason || '',
+            reason: newComplaint.reason,
             status: "pending",
             storeId: newComplaint.storeId
           }),

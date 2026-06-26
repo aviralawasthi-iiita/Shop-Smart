@@ -45,7 +45,7 @@ export default function ManagerDashboardPage() {
         </Link>
       </div>
       <h1 className="text-3xl font-bold mb-6">Manager Dashboard</h1>
-      <p className="text-lg mb-8">Review and manage quiet time requests from customers.</p>
+      <p className="text-lg mb-8">Review and manage customer complaints.</p>
 
       <ManagerDashboardClient announcements={announcements} setAnnouncements={setAnnouncements} />
     </div>

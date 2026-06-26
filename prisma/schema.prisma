@@ -17,7 +17,7 @@ model Store {
   apiToken        String?
   webhookSecret   String?
   announcements   Announcement[]
-  quietTimes      QuietTime[]
+  complaints      Complaint[]
   shopifyProducts ShopifyProduct[]
   shopifyVariants ShopifyVariant[]
   shopifyInventoryLevels ShopifyInventoryLevel[]
@@ -66,16 +66,6 @@ model ShopifyInventoryLevel {
   @@map("shopify_inventory_level")
 }
 
-model User {
-  userId     Int         @id @default(autoincrement())
-  userEmail  String      @unique
-  name       String
-  password   String
-  quietTimes QuietTime[]
-
-  @@map("user_table")
-}
-
 model Announcement {
   id         Int      @id @default(autoincrement())
   title      String
@@ -88,19 +78,16 @@ model Announcement {
   @@map("announcement")
 }
 
-model QuietTime {
+model Complaint {
   id         Int      @id @default(autoincrement())
-  userId     Int
   storeId    Int
-  date       DateTime
-  timewindow String
-  reason     String?
+  date       DateTime @default(now())
+  reason     String
   status     String   @default("pending")
   
-  user       User     @relation(fields: [userId], references: [userId])
   store      Store    @relation(fields: [storeId], references: [storeId])
 
-  @@map("quiettime")
+  @@map("complaint")
 }
 
 model OTP {
