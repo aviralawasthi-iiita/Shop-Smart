@@ -7,11 +7,16 @@ import { useRouter } from "next/navigation"
 export default function LogoutButton({isLoggedIn}:{isLoggedIn: boolean}) {
   const router = useRouter()
 
-  const handleLogout = () => {
-    // Remove user data from localStorage
+  const handleLogout = async () => {
+    // Remove user data from localStorage (for customers)
     localStorage.removeItem("userEmail")
     localStorage.removeItem("userId")
     localStorage.removeItem("managerDetails")
+
+    // Clear manager HttpOnly cookie
+    try {
+      await fetch("/api/manager/logout", { method: "POST" })
+    } catch (e) {}
 
     // Optionally redirect to login or home page
     router.push("/")

@@ -74,23 +74,23 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
   const router = useRouter()
 
 
-  // Check if user is authenticated and load data
+  // Check if user is authenticated via cookie and load data
   useEffect(() => {
-    const managerDetailsStr = localStorage.getItem("managerDetails")
-    if (!managerDetailsStr) {
-      // Redirect to login if no manager details found
-      router.push("/manager-login")
-      return
+    const checkAuth = async () => {
+      try {
+        const response = await fetch("/api/manager/me")
+        if (!response.ok) {
+          throw new Error("Not authenticated")
+        }
+        const manager: ManagerDetails = await response.json()
+        setManagerDetails(manager)
+        fetchComplaints(manager.storeId)
+      } catch (err) {
+        setError("Invalid manager session. Please login again.")
+        router.push("/manager-login")
+      }
     }
-
-    try {
-      const manager: ManagerDetails = JSON.parse(managerDetailsStr)
-      setManagerDetails(manager)
-      fetchComplaints(manager.storeId)
-    } catch (err) {
-      setError("Invalid manager session. Please login again.")
-      router.push("/manager-login")
-    }
+    checkAuth()
   }, [router])
 
   // Establish real-time requests event stream (SSE via Kafka)
@@ -375,8 +375,8 @@ export default function ManagerDashboardClient({ announcements, setAnnouncements
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={() => {
-              localStorage.removeItem("managerDetails")
+            onClick={async () => {
+              await fetch("/api/manager/logout", { method: "POST" })
               router.push("/")
             }}
             className="bg-transparent border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"

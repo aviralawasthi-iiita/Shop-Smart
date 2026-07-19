@@ -18,17 +18,13 @@ export default function ManagerLoginClient() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
  
-  // Skip login if manager details are already in localStorage
+  // Check if already authenticated via cookie
   useEffect(() => {
-    const managerDetailsStr = localStorage.getItem("managerDetails")
-    if (managerDetailsStr) {
-      try {
-        JSON.parse(managerDetailsStr)
-        router.push("/manager-dashboard")
-      } catch (e) {
-        localStorage.removeItem("managerDetails")
-      }
-    }
+    fetch("/api/manager/me")
+      .then((res) => {
+        if (res.ok) router.push("/manager-dashboard")
+      })
+      .catch(() => {})
   }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -61,9 +57,7 @@ export default function ManagerLoginClient() {
         throw new Error(data.error || data.message || "Login failed")
       }
 
-      // Save manager details to localStorage
-      localStorage.setItem("managerDetails", JSON.stringify(data))
-
+      // Authentication state is now handled by the HttpOnly cookie set by the API
       // Navigate to dashboard on successful login
       router.push("/manager-dashboard")
     } catch (err) {

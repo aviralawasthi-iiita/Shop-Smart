@@ -1,4 +1,5 @@
 import db from "./db"
+import { decrypt } from "./encryption"
 
 const SHOPIFY_API_VERSION = "2024-04"
 
@@ -105,6 +106,11 @@ export async function syncStoreInventory(storeId: number) {
     throw new Error(`Store ${storeId} is missing Shopify credentials.`)
   }
 
+  const decryptedToken = decrypt(store.apiToken)
+  if (!decryptedToken) {
+    throw new Error(`Failed to decrypt API token for store ${storeId}.`)
+  }
+
   let hasNextPage = true
   let cursor: string | null = null
 
@@ -113,7 +119,7 @@ export async function syncStoreInventory(storeId: number) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Shopify-Access-Token": store.apiToken,
+        "X-Shopify-Access-Token": decryptedToken,
       },
       body: JSON.stringify({
         query: PRODUCTS_QUERY,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import db from "@/lib/db"
 import { syncStoreInventory } from "@/lib/shopifySync"
+import { encrypt } from "@/lib/encryption"
 
 export async function POST(request: Request) {
   try {
@@ -19,13 +20,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Store not found" }, { status: 404 })
     }
 
+    // Encrypt credentials before saving
+    const encryptedApiToken = encrypt(apiToken)
+    const encryptedWebhookSecret = encrypt(webhookSecret)
+
     // Update the store with Shopify credentials
     const updatedStore = await db.store.update({
       where: { storeId: Number(storeId) },
       data: {
         shopDomain,
-        apiToken,
-        webhookSecret,
+        apiToken: encryptedApiToken,
+        webhookSecret: encryptedWebhookSecret,
       },
     })
 

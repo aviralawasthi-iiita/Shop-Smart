@@ -12,36 +12,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 
-// --- Custom Hook for Typewriter Effect ---
-const useTypewriter = (text: string, speed = 50) => {
-  const [displayText, setDisplayText] = useState("")
-
-  useEffect(() => {
-    let cancelled = false
-    
-    setDisplayText((prev) => text.startsWith(prev) ? prev : "")
-
-    const interval = setInterval(() => {
-      setDisplayText((current) => {
-        if (current.length < text.length && text.startsWith(current)) {
-          return text.slice(0, current.length + 1)
-        }
-        if (!text.startsWith(current)) {
-          return ""
-        }
-        return current
-      })
-    }, speed)
-
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [text, speed])
-  
-  return displayText
-}
+// --- Custom Hook for Typewriter Effect Removed in favor of native HTTP Streaming ---
 
 // --- SpeechRecognition Interface ---
 interface ISpeechRecognition extends EventTarget {
@@ -247,7 +221,7 @@ export default function CustomerClient() {
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isProcessingApiCall = useRef(false)
 
-  const displayedResponse = useTypewriter(apiResponse)
+  // Streaming removes the need for a fake typewriter effect
 
   const isMobile = useMemo(() => /Mobi|Android/i.test(navigator.userAgent), [])
 
@@ -351,6 +325,7 @@ export default function CustomerClient() {
   // --- Image capture & API ---
   const captureAndSendImage = async () => {
     if (!videoRef.current) return
+    stopSpeech()
     setAppState("processing_image")
     setApiResponse("Analyzing image...")
     const canvas = document.createElement("canvas")
@@ -406,16 +381,28 @@ export default function CustomerClient() {
               base64Image: base64Image
             }),
           })
-          const answerData = await answerRes.json()
-          if (!answerRes.ok) throw new Error(answerData.detail)
+          if (!answerRes.ok) throw new Error("Failed to get response")
+          if (!answerRes.body) throw new Error("No response body")
 
           await speechPromise; // Wait for the first message to finish speaking
 
-          setSessionId(answerData.session_id)
+          const returnedSessionId = answerRes.headers.get("X-Session-Id");
+          if (returnedSessionId) setSessionId(returnedSessionId);
           if (chatMode === "new_chat") setChatMode("follow_up")
-          const finalFullText = intermediateText + "\n\n" + answerData.response;
-          setApiResponse(finalFullText)
-          speakText(answerData.response) // Speak the final part
+          
+          const reader = answerRes.body.getReader();
+          const decoder = new TextDecoder();
+          let streamText = "";
+          
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            streamText += chunk;
+            setApiResponse(intermediateText + "\n\n" + streamText);
+          }
+          
+          speakText(streamText) // Speak the final part
 
           setAppState("image_session_active")
         } catch (e) {
@@ -435,6 +422,7 @@ export default function CustomerClient() {
   const handleFollowUpQuestion = async (text: string) => {
     if (!text.trim()) return
     setInputText("") // Clear the text in the input box
+    stopSpeech()
     
     let currentSessionId = chatMode === "follow_up" ? sessionId : null;
 
@@ -476,18 +464,28 @@ export default function CustomerClient() {
           searchTerms: analyzeData.searchTerms
         }),
       })
-      const answerData = await answerRes.json()
-      if (!answerRes.ok) throw new Error(answerData.detail)
+      if (!answerRes.ok) throw new Error("Failed to get response")
+      if (!answerRes.body) throw new Error("No response body")
 
       await speechPromise; // Wait for the first message to finish
 
-      if (answerData.session_id) setSessionId(answerData.session_id);
+      const returnedSessionId = answerRes.headers.get("X-Session-Id");
+      if (returnedSessionId) setSessionId(returnedSessionId);
       if (chatMode === "new_chat") setChatMode("follow_up");
 
-      const finalFullText = intermediateText ? intermediateText + "\n\n" + answerData.response : answerData.response;
-      setApiResponse(finalFullText);
+      const reader = answerRes.body.getReader();
+      const decoder = new TextDecoder();
+      let streamText = "";
+          
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        streamText += chunk;
+        setApiResponse(intermediateText ? intermediateText + "\n\n" + streamText : streamText);
+      }
 
-      speakText(answerData.response);
+      speakText(streamText);
 
       setAppState(isCameraOn ? "image_session_active" : "general_listening")
     } catch (e) {
@@ -863,9 +861,11 @@ export default function CustomerClient() {
                       {isProcessingApiCall.current && <Loader2 className="h-4 w-4 animate-spin text-blue-400" />}
                     </h3>
                     <div className="p-4 bg-blue-900/20 border border-blue-800/50 rounded-lg min-h-[150px] shadow-inner">
-                      <p className="text-white whitespace-pre-wrap leading-relaxed text-lg">
-                        {displayedResponse || "..."}
-                      </p>
+                      <div className="text-white text-lg prose prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-gray-900">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {apiResponse || "..."}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                   <div className="mt-6 relative">

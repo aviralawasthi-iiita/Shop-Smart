@@ -1,6 +1,8 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from "next/server";
+import { unstable_cache } from "next/cache";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { HumanMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
 import db from "@/lib/db";
 
 declare global {
@@ -10,6 +12,41 @@ declare global {
 if (!global.__chatHistory) {
   global.__chatHistory = new Map();
 }
+
+const getCachedProducts = unstable_cache(
+  async (storeId: number, searchTerms: string[]) => {
+    return await db.shopifyProduct.findMany({
+      where: {
+        storeId: storeId,
+        productType: { in: searchTerms },
+      },
+      include: {
+        variants: {
+          include: {
+            inventoryLevels: true,
+          },
+        },
+      },
+      take: 100,
+    });
+  },
+  ['product-search-cache'],
+  { revalidate: 60 }
+);
+
+const getCachedFallbackProducts = unstable_cache(
+  async (storeId: number) => {
+    return await db.shopifyProduct.findMany({
+      where: { storeId },
+      include: {
+        variants: { include: { inventoryLevels: true } }
+      },
+      take: 5,
+    });
+  },
+  ['fallback-product-cache'],
+  { revalidate: 60 }
+);
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,33 +73,14 @@ export async function POST(req: NextRequest) {
       }
 
       if (isProductQuery && searchTerms && searchTerms.length > 0) {
-        let matchingProducts = await db.shopifyProduct.findMany({
-          where: {
-            storeId: storeId,
-            productType: { in: searchTerms },
-          },
-          include: {
-            variants: {
-              include: {
-                inventoryLevels: true,
-              },
-            },
-          },
-          take: 100,
-        });
+        let matchingProducts = await getCachedProducts(storeId, searchTerms);
 
         // Construct Context String
         contextString = "\n\n[SYSTEM: LIVE STORE INVENTORY CONTEXT]\n";
         if (matchingProducts.length === 0) {
           if (base64Image) {
             contextString += "IMPORTANT INSTRUCTION: We do NOT have this exact product in stock. You MUST explicitly say 'We don't have this exact product, but we do have other products in stock.' Then, carefully evaluate the list of fallback products below. ONLY suggest them as alternatives if they are genuinely functionally similar to the product the user is holding. If they are, provide a brief reason why they might be a good alternative. If none are similar, simply state what else is available without calling them alternatives.\n";
-            const fallbackProducts = await db.shopifyProduct.findMany({
-              where: { storeId },
-              include: {
-                variants: { include: { inventoryLevels: true } }
-              },
-              take: 5,
-            });
+            const fallbackProducts = await getCachedFallbackProducts(storeId);
             for (const product of fallbackProducts) {
               contextString += `- Fallback Product: ${product.title} (Type: ${product.productType || "Unknown"}, Vendor: ${product.vendor || "Unknown"})\n`;
               for (const variant of product.variants) {
@@ -75,9 +93,9 @@ export async function POST(req: NextRequest) {
           }
         } else {
           if (base64Image) {
-            contextString += "IMPORTANT INSTRUCTION: We found matching products. You MUST explicitly say 'The product you are currently holding is [Product Name]' and give its details (price, availability). Then, you MUST identify the product correctly, and carefully evaluate the list of products below to find valid alternatives. ONLY provide alternatives that are functionally similar to the original product (e.g., do not suggest deodorant as an alternative to shaving cream). Do not just provide cheaper alternatives; list any genuinely similar alternatives present in the list, and include a brief reason as to why each might be better or how it compares.\n";
+            contextString += "IMPORTANT INSTRUCTION: We found matching products. You MUST explicitly say 'The product you are currently holding is [Product Name]' and give its details (price, availability). Then, you MUST identify the product correctly, and carefully evaluate the list of products below to find valid alternatives. ONLY provide alternatives that are functionally similar to the original product (e.g., do not suggest deodorant as an alternative to shaving cream). Do not just provide cheaper alternatives; list any genuinely similar alternatives present in the list, and include a brief reason as to why each might be better or how it compares. You MUST format your list of alternatives using Markdown bullet points.\n";
           } else {
-            contextString += "IMPORTANT INSTRUCTION: You MUST explicitly list the available items found below with their details (e.g. name, price, availability).\n";
+            contextString += "IMPORTANT INSTRUCTION: You MUST explicitly list the available items found below with their details (e.g. name, price, availability). You MUST format this list using Markdown bullet points, with each item on a new line.\n";
           }
           for (const product of matchingProducts) {
             contextString += `- Product: ${product.title} (Type: ${product.productType || "Unknown"}, Vendor: ${product.vendor || "Unknown"})\n`;
@@ -96,11 +114,12 @@ export async function POST(req: NextRequest) {
       temperature: 0.3,
       apiKey: process.env.GEMINI_API_KEY,
       maxRetries: 0,
+      streaming: true,
     });
 
     let history = sessionId && global.__chatHistory.has(sessionId)
       ? global.__chatHistory.get(sessionId)!
-      : [new SystemMessage(`You are a helpful and accessible assistant exclusively for ${storeName}. You must NEVER refer to yourself as a ShopSmart assistant or mention ShopSmart. Always use the name "${storeName}" when referring to the store. Provide concise, clear, and easy-to-understand answers. Do not use any markdown formatting like bold (**), italics (*), or lists in your responses. Your responses will be read aloud by a text-to-speech engine, so format them as plain conversational text. If live store inventory context is provided below the user's message, use it strictly to answer stock and price questions.`)];
+      : [new SystemMessage(`You are a helpful and accessible assistant exclusively for ${storeName}. You must NEVER refer to yourself as a ShopSmart assistant or mention ShopSmart. Always use the name "${storeName}" when referring to the store. Provide concise, clear, and easy-to-understand answers. When listing items or products, always format them cleanly using Markdown bullet points. Your responses will be read aloud by a text-to-speech engine, so avoid excessive punctuation like hashtags, but bullet points are highly encouraged. If live store inventory context is provided below the user's message, use it strictly to answer stock and price questions.`)];
 
     // Inject context into the user's question if we have it
     const finalQuestion = contextString ? `${question}${contextString}` : question;
@@ -115,15 +134,35 @@ export async function POST(req: NextRequest) {
 
     history.push(new HumanMessage({ content: messageContent }));
 
-    const response = await llm.invoke(history);
-    history.push(response);
-
+    const stream = await llm.stream(history);
     const newSessionId = sessionId || crypto.randomUUID();
-    global.__chatHistory.set(newSessionId, history);
 
-    return NextResponse.json({
-      session_id: newSessionId,
-      response: response.content
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        let fullResponse = "";
+        try {
+          for await (const chunk of stream) {
+            const content = chunk.content as string;
+            fullResponse += content;
+            controller.enqueue(new TextEncoder().encode(content));
+          }
+          // After streaming is done, save the full response to history
+          history.push(new AIMessage({ content: fullResponse }));
+          global.__chatHistory.set(newSessionId, history);
+        } catch (e) {
+          console.error("Streaming error:", e);
+        } finally {
+          controller.close();
+        }
+      }
+    });
+
+    return new Response(readableStream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Transfer-Encoding": "chunked",
+        "X-Session-Id": newSessionId,
+      },
     });
 
   } catch (error: any) {

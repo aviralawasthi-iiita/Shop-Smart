@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import bcrypt from "bcrypt";
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,11 +37,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Create the Store
-    // In production, remember to hash the password.
+    const hashedPassword = await bcrypt.hash(managerPassword, 10);
     const newStore = await prisma.store.create({
       data: {
         managerEmail,
-        managerPassword,
+        managerPassword: hashedPassword,
         storeName,
         storeLocation,
       },

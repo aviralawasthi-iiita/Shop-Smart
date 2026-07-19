@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import crypto from "crypto"
 import db from "@/lib/db"
+import { decrypt } from "@/lib/encryption"
 
 export async function POST(request: Request) {
   try {
@@ -21,9 +22,14 @@ export async function POST(request: Request) {
 
     const rawBody = await request.text()
 
+    const decryptedSecret = decrypt(store.webhookSecret)
+    if (!decryptedSecret) {
+      return NextResponse.json({ message: "Store not found or unauthorized (decryption failed)" }, { status: 404 })
+    }
+
     // Validate HMAC signature
     const hash = crypto
-      .createHmac("sha256", store.webhookSecret)
+      .createHmac("sha256", decryptedSecret)
       .update(rawBody, "utf8")
       .digest("base64")
 
